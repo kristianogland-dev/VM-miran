@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const supabase = require('./db');
 const { calcMatchPoints, calcFinalBonus } = require('./scoring');
 
 const app = express();
@@ -10,6 +9,20 @@ app.use(express.json());
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'vm2026admin';
 
+function getDb() {
+  // Re-require each time so hot env changes work; also fails gracefully
+  return require('./db');
+}
+
+function requireDb(req, res, next) {
+  if (!getDb()) {
+    return res.status(503).json({
+      error: 'Database ikke konfigurert. Sett SUPABASE_URL og SUPABASE_SERVICE_KEY i Netlify Environment Variables.',
+    });
+  }
+  next();
+}
+
 function requireAdmin(req, res, next) {
   if (req.headers['x-admin-password'] !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Feil passord' });
@@ -17,14 +30,24 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ─── Admin verify (password check only, no DB) ───────────────────────────────
+// ─── Health / verify (no DB needed) ──────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    db: !!getDb(),
+    supabase_url: !!process.env.SUPABASE_URL,
+    service_key: !!process.env.SUPABASE_SERVICE_KEY,
+    admin_password_set: !!process.env.ADMIN_PASSWORD,
+  });
+});
+
 app.post('/api/admin/verify', requireAdmin, (req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, db: !!getDb() });
 });
 
 // ─── Players ──────────────────────────────────────────────────────────────────
 app.get('/api/players', async (req, res) => {
-  const { data: players, error } = await supabase
+  const { data: players, error } = await getDb()
     .from('players')
     .select('*, scores(points_earned)')
     .order('name');
@@ -43,7 +66,7 @@ app.post('/api/players', async (req, res) => {
   const { name, age, favorite_team, is_child, paid_entry } = req.body;
   if (!name || age == null) return res.status(400).json({ error: 'Navn og alder er påkrevd' });
 
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('players')
     .insert({ name: name.trim(), age, favorite_team: favorite_team || '', is_child: !!is_child, paid_entry: !!paid_entry })
     .select()
@@ -58,7 +81,7 @@ app.post('/api/players', async (req, res) => {
 
 app.put('/api/players/:id', requireAdmin, async (req, res) => {
   const { name, age, favorite_team, is_child, paid_entry } = req.body;
-  const { error } = await supabase
+  const { error } = await getDb()
     .from('players')
     .update({ name, age, favorite_team, is_child: !!is_child, paid_entry: !!paid_entry })
     .eq('id', req.params.id);
@@ -67,14 +90,14 @@ app.put('/api/players/:id', requireAdmin, async (req, res) => {
 });
 
 app.delete('/api/players/:id', requireAdmin, async (req, res) => {
-  const { error } = await supabase.from('players').delete().eq('id', req.params.id);
+  const { error } = await getDb().from('players').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true });
 });
 
 // ─── Matches ──────────────────────────────────────────────────────────────────
 app.get('/api/matches', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('matches')
     .select('*')
     .order('match_order');
@@ -83,7 +106,7 @@ app.get('/api/matches', async (req, res) => {
 });
 
 app.get('/api/matches/:id', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('matches')
     .select('*')
     .eq('id', req.params.id)
@@ -103,7 +126,7 @@ app.put('/api/matches/:id/result', requireAdmin, async (req, res) => {
   if (away_team) updates.away_team = away_team;
   if (status === 'finished' || status === 'live') updates.locked = true;
 
-  const { error } = await supabase.from('matches').update(updates).eq('id', req.params.id);
+  const { error } = await getDb().from('matches').update(updates).eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
 
   if (status === 'finished' && home_score != null && away_score != null) {
@@ -115,7 +138,7 @@ app.put('/api/matches/:id/result', requireAdmin, async (req, res) => {
 // Lock matches past kickoff
 async function lockPastMatches() {
   const now = new Date().toISOString();
-  await supabase
+  await getDb()
     .from('matches')
     .update({ locked: true })
     .lte('kickoff_utc', now)
@@ -124,7 +147,7 @@ async function lockPastMatches() {
 
 // ─── Predictions ──────────────────────────────────────────────────────────────
 app.get('/api/predictions/:playerId', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('predictions')
     .select('*, matches(home_team, away_team, round, group_label, kickoff_utc, status, locked)')
     .eq('player_id', req.params.playerId)
@@ -136,7 +159,7 @@ app.get('/api/predictions/:playerId', async (req, res) => {
 });
 
 app.get('/api/predictions/match/:matchId', async (req, res) => {
-  const { data: match } = await supabase
+  const { data: match } = await getDb()
     .from('matches')
     .select('locked')
     .eq('id', req.params.matchId)
@@ -144,7 +167,7 @@ app.get('/api/predictions/match/:matchId', async (req, res) => {
 
   if (!match?.locked) return res.json([]);
 
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('predictions')
     .select('*, players(name)')
     .eq('match_id', req.params.matchId);
@@ -160,7 +183,7 @@ app.post('/api/predictions', async (req, res) => {
     return res.status(400).json({ error: 'Manglende data' });
   }
 
-  const { data: match } = await supabase
+  const { data: match } = await getDb()
     .from('matches')
     .select('locked')
     .eq('id', match_id)
@@ -169,7 +192,7 @@ app.post('/api/predictions', async (req, res) => {
   if (!match) return res.status(404).json({ error: 'Kamp ikke funnet' });
   if (match.locked) return res.status(400).json({ error: 'Kampen er låst – tips ikke tillatt' });
 
-  const { error } = await supabase
+  const { error } = await getDb()
     .from('predictions')
     .upsert({ player_id, match_id, predicted_home, predicted_away, submitted_at: new Date().toISOString() },
              { onConflict: 'player_id,match_id' });
@@ -183,7 +206,7 @@ app.post('/api/predictions/bulk', async (req, res) => {
   const { player_id, predictions } = req.body;
   if (!player_id || !Array.isArray(predictions)) return res.status(400).json({ error: 'Manglende data' });
 
-  const { data: allMatches } = await supabase.from('matches').select('id, locked');
+  const { data: allMatches } = await getDb().from('matches').select('id, locked');
   const lockedSet = new Set((allMatches || []).filter((m) => m.locked).map((m) => m.id));
 
   const toInsert = [];
@@ -194,7 +217,7 @@ app.post('/api/predictions/bulk', async (req, res) => {
   }
 
   if (toInsert.length > 0) {
-    const { error } = await supabase.from('predictions').upsert(toInsert, { onConflict: 'player_id,match_id' });
+    const { error } = await getDb().from('predictions').upsert(toInsert, { onConflict: 'player_id,match_id' });
     if (error) return res.status(500).json({ error: error.message });
   }
   res.json({ ok: true, errors });
@@ -202,13 +225,13 @@ app.post('/api/predictions/bulk', async (req, res) => {
 
 // ─── Final predictions ────────────────────────────────────────────────────────
 app.get('/api/final-predictions/:playerId', async (req, res) => {
-  const { data } = await supabase.from('final_predictions').select('*').eq('player_id', req.params.playerId).single();
+  const { data } = await getDb().from('final_predictions').select('*').eq('player_id', req.params.playerId).single();
   res.json(data || null);
 });
 
 app.post('/api/final-predictions', async (req, res) => {
   const { player_id, first_goalscorer, corners, throw_ins, yellow_cards, red_cards, offsides, free_kicks } = req.body;
-  const { error } = await supabase.from('final_predictions').upsert(
+  const { error } = await getDb().from('final_predictions').upsert(
     { player_id, first_goalscorer, corners, throw_ins, yellow_cards, red_cards, offsides, free_kicks, submitted_at: new Date().toISOString() },
     { onConflict: 'player_id' }
   );
@@ -218,13 +241,13 @@ app.post('/api/final-predictions', async (req, res) => {
 
 // ─── Meta predictions ─────────────────────────────────────────────────────────
 app.get('/api/meta-predictions/:playerId', async (req, res) => {
-  const { data } = await supabase.from('meta_predictions').select('*').eq('player_id', req.params.playerId).single();
+  const { data } = await getDb().from('meta_predictions').select('*').eq('player_id', req.params.playerId).single();
   res.json(data || null);
 });
 
 app.post('/api/meta-predictions', async (req, res) => {
   const { player_id, tournament_winner, top_scorer, best_player } = req.body;
-  const { error } = await supabase.from('meta_predictions').upsert(
+  const { error } = await getDb().from('meta_predictions').upsert(
     { player_id, tournament_winner, top_scorer, best_player, submitted_at: new Date().toISOString() },
     { onConflict: 'player_id' }
   );
@@ -234,7 +257,7 @@ app.post('/api/meta-predictions', async (req, res) => {
 
 // ─── Scores / Leaderboard ─────────────────────────────────────────────────────
 app.get('/api/scores', async (req, res) => {
-  const { data: players, error } = await supabase
+  const { data: players, error } = await getDb()
     .from('players')
     .select('id, name, favorite_team, is_child, scores(points_earned)')
     .order('name');
@@ -252,7 +275,7 @@ app.get('/api/scores', async (req, res) => {
 });
 
 app.get('/api/scores/player/:playerId', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('scores')
     .select('*, matches(home_team, away_team, round, home_score, away_score)')
     .eq('player_id', req.params.playerId)
@@ -263,10 +286,10 @@ app.get('/api/scores/player/:playerId', async (req, res) => {
 
 // ─── Score recalculation ──────────────────────────────────────────────────────
 async function recalculateMatchScores(matchId) {
-  const { data: match } = await supabase.from('matches').select('*').eq('id', matchId).single();
+  const { data: match } = await getDb().from('matches').select('*').eq('id', matchId).single();
   if (!match || match.home_score == null || match.away_score == null) return;
 
-  const { data: predictions } = await supabase.from('predictions').select('*').eq('match_id', matchId);
+  const { data: predictions } = await getDb().from('predictions').select('*').eq('match_id', matchId);
   if (!predictions?.length) return;
 
   const upserts = [];
@@ -277,7 +300,7 @@ async function recalculateMatchScores(matchId) {
 
     let extraPoints = 0, extraBreakdown = {};
     if (match.round === 'final') {
-      const { data: fp } = await supabase.from('final_predictions').select('*').eq('player_id', pred.player_id).single();
+      const { data: fp } = await getDb().from('final_predictions').select('*').eq('player_id', pred.player_id).single();
       if (fp) {
         const { points: ep, breakdown: eb } = calcFinalBonus(match, fp);
         extraPoints = ep; extraBreakdown = eb;
@@ -292,11 +315,11 @@ async function recalculateMatchScores(matchId) {
     });
   }
 
-  await supabase.from('scores').upsert(upserts, { onConflict: 'player_id,match_id' });
+  await getDb().from('scores').upsert(upserts, { onConflict: 'player_id,match_id' });
 }
 
 app.post('/api/admin/recalculate', requireAdmin, async (req, res) => {
-  const { data: finished } = await supabase
+  const { data: finished } = await getDb()
     .from('matches')
     .select('id')
     .eq('status', 'finished')
@@ -309,7 +332,7 @@ app.post('/api/admin/recalculate', requireAdmin, async (req, res) => {
 });
 
 app.get('/api/admin/match/:matchId/predictions', requireAdmin, async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await getDb()
     .from('predictions')
     .select('*, players(name)')
     .eq('match_id', req.params.matchId)
@@ -325,7 +348,7 @@ app.post('/api/lock-check', async (req, res) => {
 
 // ─── Admin: seed matches ───────────────────────────────────────────────────────
 app.post('/api/admin/seed', requireAdmin, async (req, res) => {
-  const { count } = await supabase.from('matches').select('*', { count: 'exact', head: true });
+  const { count } = await getDb().from('matches').select('*', { count: 'exact', head: true });
   if (count > 0) return res.json({ ok: true, skipped: true, count });
 
   const GROUP_MATCHES = [
@@ -436,7 +459,7 @@ app.post('/api/admin/seed', requireAdmin, async (req, res) => {
   ];
 
   const rows = GROUP_MATCHES.map((m) => ({ ...m, status: 'scheduled', locked: false }));
-  const { error } = await supabase.from('matches').insert(rows);
+  const { error } = await getDb().from('matches').insert(rows);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true, seeded: rows.length });
 });

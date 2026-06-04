@@ -3,10 +3,14 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Warning: SUPABASE_URL or SUPABASE_SERVICE_KEY not set. DB calls will fail.');
-}
+let supabase = null;
 
-const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+if (supabaseUrl && supabaseKey) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseKey);
+  } catch (e) {
+    console.error('Failed to create Supabase client:', e.message);
+  }
+}
 
 module.exports = supabase;
