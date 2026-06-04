@@ -10,14 +10,14 @@ app.use(express.json());
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'vm2026admin';
 
 function getDb() {
-  // Re-require each time so hot env changes work; also fails gracefully
-  return require('./db');
+  return require('./db').client;
 }
 
 function requireDb(req, res, next) {
   if (!getDb()) {
+    const { initError } = require('./db');
     return res.status(503).json({
-      error: 'Database ikke konfigurert. Sett SUPABASE_URL og SUPABASE_SERVICE_KEY i Netlify Environment Variables.',
+      error: `Database ikke tilgjengelig: ${initError || 'Ukjent feil'}. Sjekk SUPABASE_URL og SUPABASE_SERVICE_KEY i Netlify.`,
     });
   }
   next();
@@ -32,11 +32,11 @@ function requireAdmin(req, res, next) {
 
 // ─── Health / verify (no DB needed) ──────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  const db = require('./db');
+  const { client, initError } = require('./db');
   res.json({
     ok: true,
-    db: !!db,
-    db_error: db.initError || null,
+    db: !!client,
+    db_error: initError || null,
     supabase_url: !!process.env.SUPABASE_URL,
     supabase_url_value: (process.env.SUPABASE_URL || '').substring(0, 30) + '...',
     service_key: !!process.env.SUPABASE_SERVICE_KEY,
