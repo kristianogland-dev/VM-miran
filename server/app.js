@@ -358,8 +358,13 @@ app.post('/api/lock-check', async (req, res) => {
 
 // ─── Admin: seed matches ───────────────────────────────────────────────────────
 app.post('/api/admin/seed', requireAdmin, async (req, res) => {
-  const { count } = await getDb().from('matches').select('*', { count: 'exact', head: true });
-  if (count > 0) return res.json({ ok: true, skipped: true, count });
+  try {
+    const { count, error: countErr } = await getDb().from('matches').select('*', { count: 'exact', head: true });
+    if (countErr) return res.status(500).json({ error: countErr.message });
+    if (count > 0) return res.json({ ok: true, skipped: true, count });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 
   const GROUP_MATCHES = [
     { home_team: 'Mexico', away_team: 'Sør-Afrika', group_label: 'A', round: 'group', kickoff_utc: '2026-06-11T21:00:00Z', match_order: 1 },
@@ -468,10 +473,21 @@ app.post('/api/admin/seed', requireAdmin, async (req, res) => {
     { home_team: 'Vinner kamp 101', away_team: 'Vinner kamp 102', group_label: null, round: 'final', kickoff_utc: '2026-07-27T21:00:00Z', match_order: 104 },
   ];
 
-  const rows = GROUP_MATCHES.map((m) => ({ ...m, status: 'scheduled', locked: false }));
-  const { error } = await getDb().from('matches').insert(rows);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ ok: true, seeded: rows.length });
+  try {
+    const rows = GROUP_MATCHES.map((m) => ({ ...m, status: 'scheduled', locked: false }));
+
+    // Insert in batches of 25 to avoid timeouts
+    const batchSize = 25;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const { error } = await getDb().from('matches').insert(batch);
+      if (error) return res.status(500).json({ error: `Batch ${i}-${i + batchSize}: ${error.message}` });
+    }
+
+    res.json({ ok: true, seeded: rows.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = app;
