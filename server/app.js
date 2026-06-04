@@ -48,6 +48,13 @@ app.post('/api/admin/verify', requireAdmin, (req, res) => {
   res.json({ ok: true, db: !!getDb() });
 });
 
+// All routes below require a working DB connection
+app.use('/api', (req, res, next) => {
+  // Skip for routes that don't need DB
+  if (req.path === '/health' || req.path === '/admin/verify') return next();
+  requireDb(req, res, next);
+});
+
 // ─── Players ──────────────────────────────────────────────────────────────────
 app.get('/api/players', async (req, res) => {
   const { data: players, error } = await getDb()

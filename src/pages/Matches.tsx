@@ -90,6 +90,12 @@ export default function Matches() {
 
       {loading ? (
         <div className="text-center text-gray-400 py-12">Laster kamper…</div>
+      ) : matches.length === 0 && !error ? (
+        <div className="card text-center py-10">
+          <p className="text-2xl mb-3">🗄️</p>
+          <p className="text-white font-medium mb-1">Ingen kamper i databasen ennå</p>
+          <p className="text-gray-400 text-sm">Gå til <strong>Admin</strong>-siden og trykk <strong>"🌱 Seed kamper"</strong> for å laste inn alle 104 kamper.</p>
+        </div>
       ) : displayMatches.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
           {tab === 'live' ? 'Ingen kamper spilles nå' :

@@ -41,6 +41,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch('/api/players')
       const data = await res.json()
+      if (!Array.isArray(data)) return  // API error object – keep current state
       setPlayers(data)
       // Update current player data if logged in
       if (currentPlayer) {
