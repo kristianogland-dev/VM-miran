@@ -11,12 +11,17 @@ function AdminLogin({ onLogin }: { onLogin: (pw: string) => void }) {
   const [error, setError] = useState('')
 
   const tryLogin = async () => {
+    if (!pw) return
     try {
-      await api.recalculateScores(pw)
+      await api.verifyAdmin(pw)
       localStorage.setItem(ADMIN_PW_KEY, pw)
       onLogin(pw)
-    } catch {
-      setError('Feil passord')
+    } catch (e: any) {
+      if (e.message?.includes('Feil passord') || e.message?.includes('Uautorisert')) {
+        setError('Feil passord')
+      } else {
+        setError(`Tilkoblingsfeil: ${e.message}`)
+      }
     }
   }
 
@@ -52,8 +57,7 @@ export default function Admin() {
 
   useEffect(() => {
     if (adminPw) {
-      // Verify stored password
-      api.recalculateScores(adminPw)
+      api.verifyAdmin(adminPw)
         .then(() => { setAuthed(true); loadData() })
         .catch(() => { localStorage.removeItem(ADMIN_PW_KEY); setAdminPw('') })
     }

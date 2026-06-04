@@ -12,10 +12,15 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'vm2026admin';
 
 function requireAdmin(req, res, next) {
   if (req.headers['x-admin-password'] !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Uautorisert' });
+    return res.status(401).json({ error: 'Feil passord' });
   }
   next();
 }
+
+// ─── Admin verify (password check only, no DB) ───────────────────────────────
+app.post('/api/admin/verify', requireAdmin, (req, res) => {
+  res.json({ ok: true });
+});
 
 // ─── Players ──────────────────────────────────────────────────────────────────
 app.get('/api/players', async (req, res) => {

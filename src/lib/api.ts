@@ -70,4 +70,7 @@ export const api = {
   seedMatches: (adminPw: string) => req<any>('/admin/seed', {
     method: 'POST', headers: { 'x-admin-password': adminPw }
   }),
+  verifyAdmin: (adminPw: string) => req<any>('/admin/verify', {
+    method: 'POST', headers: { 'x-admin-password': adminPw }
+  }),
 }
