@@ -108,6 +108,15 @@ export default function Admin() {
     }
   }
 
+  const seedDb = async () => {
+    try {
+      const res: any = await api.seedMatches(adminPw)
+      if (res.skipped) toast.success(`Databasen har allerede ${res.count} kamper`)
+      else toast.success(`Seedet ${res.seeded} kamper!`)
+      loadData()
+    } catch (e: any) { toast.error(e.message) }
+  }
+
   const recalculateAll = async () => {
     try {
       const res: any = await api.recalculateScores(adminPw)
@@ -135,7 +144,12 @@ export default function Admin() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gold-400">⚙️ Admin</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          {matches.length === 0 && (
+            <button className="btn-primary text-sm" onClick={seedDb}>
+              🌱 Seed kamper (104)
+            </button>
+          )}
           <button className="btn-secondary text-sm" onClick={recalculateAll}>
             🔄 Omberegn alle poeng
           </button>

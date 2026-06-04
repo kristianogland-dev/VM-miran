@@ -11,6 +11,7 @@ export default function Matches() {
   const [matchPredictions, setMatchPredictions] = useState<Record<number, any[]>>({})
   const [tab, setTab] = useState<Tab>('upcoming')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const { currentPlayer } = usePlayer()
 
   useEffect(() => {
@@ -38,8 +39,8 @@ export default function Matches() {
         })
       )
       setMatchPredictions(predMap)
-    } catch (e) {
-      console.error(e)
+    } catch (e: any) {
+      setError(e.message)
     } finally {
       setLoading(false)
     }
@@ -64,6 +65,13 @@ export default function Matches() {
   return (
     <div>
       <h2 className="text-2xl font-bold text-gold-400 mb-6">⚽ Kamper</h2>
+
+      {error && (
+        <div className="card border-red-700 text-red-400 mb-4">
+          ⚠️ Klarte ikke laste kamper: {error}
+          <p className="text-xs mt-1 text-gray-400">Sjekk at miljøvariabler er satt i Netlify og at databasen er seedet via Admin-panelet.</p>
+        </div>
+      )}
 
       <div className="flex gap-6 border-b border-forest-800 mb-6">
         {tabs.map((t) => (

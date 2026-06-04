@@ -67,4 +67,7 @@ export const api = {
   getAdminMatchPredictions: (matchId: number, adminPw: string) => req<any[]>(`/admin/match/${matchId}/predictions`, {
     headers: { 'x-admin-password': adminPw }
   }),
+  seedMatches: (adminPw: string) => req<any>('/admin/seed', {
+    method: 'POST', headers: { 'x-admin-password': adminPw }
+  }),
 }
