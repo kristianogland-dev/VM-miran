@@ -32,10 +32,13 @@ function requireAdmin(req, res, next) {
 
 // ─── Health / verify (no DB needed) ──────────────────────────────────────────
 app.get('/api/health', (req, res) => {
+  const db = require('./db');
   res.json({
     ok: true,
-    db: !!getDb(),
+    db: !!db,
+    db_error: db.initError || null,
     supabase_url: !!process.env.SUPABASE_URL,
+    supabase_url_value: (process.env.SUPABASE_URL || '').substring(0, 30) + '...',
     service_key: !!process.env.SUPABASE_SERVICE_KEY,
     admin_password_set: !!process.env.ADMIN_PASSWORD,
   });
