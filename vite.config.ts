@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // In local dev, proxy /api/* to the Express server on port 3001
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,

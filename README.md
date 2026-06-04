@@ -1,77 +1,73 @@
 # VM 2026 – Tippekonkurranse ⚽
 
-En full-stack webapplikasjon for fotball-VM 2026 tippekonkurranse blant venner.
+Full-stack World Cup 2026 betting competition app for friends.  
+**Frontend:** Vite + React + TypeScript + Tailwind CSS  
+**Backend:** Express via Netlify Functions  
+**Database:** Supabase (PostgreSQL)
+
+---
 
 ## Kom i gang
 
-### Krav
-- Node.js 18+
-- pnpm
+### 1. Opprett Supabase-prosjekt
 
-### Installasjon
+1. Gå til [supabase.com](https://supabase.com) og opprett en gratis konto
+2. Lag et nytt prosjekt
+3. Gå til **SQL Editor** og kjør innholdet i [`supabase/schema.sql`](supabase/schema.sql)
+4. Gå til **Project Settings → API** og kopier:
+   - **Project URL** → `SUPABASE_URL` og `VITE_SUPABASE_URL`
+   - **service_role** key → `SUPABASE_SERVICE_KEY`
+   - **anon** key → `VITE_SUPABASE_ANON_KEY`
+
+### 2. Seed databasen
 
 ```bash
+# Kopier og fyll inn .env
+cp .env.example .env
+
 pnpm install
+pnpm seed
 ```
 
-### Oppsett
-
-Kopier `.env.example` til `.env` og fyll inn:
-
-```env
-VITE_FOOTBALL_API_KEY=din_api_nøkkel   # fra football-data.org (gratis tier)
-ADMIN_PASSWORD=velg_et_passord
-PORT=3001
-```
-
-> **API-nøkkel:** Registrer deg gratis på [football-data.org](https://www.football-data.org/) for live-resultater.
-
-### Kjør lokalt
+### 3. Lokalt utvikling
 
 ```bash
-# Start både API-server og Vite-dev-server
-pnpm dev
-```
-
-- Frontend: http://localhost:5173
-- API: http://localhost:3001
-
-### Bygg for produksjon
-
-```bash
-pnpm build
+pnpm dev   # starter API (3001) + Vite (5173) parallelt
 ```
 
 ---
 
-## Funksjoner
+## Deploy til Netlify
 
-- **Poengtabell** – live rangeringsliste med auto-oppdatering hvert 60. sekund
-- **Kamper** – live/kommende/ferdig-tabs med live-resultater fra football-data.org API
-- **Mine tips** – lås inn tips for alle 72 gruppekamper + sluttspillkamper
-- **Deltakere** – legg til/vis deltakere med innsatsstatus
-- **Admin** – skriv inn resultater, omberegn poeng, marker betalingsstatus
+1. Koble GitHub-repoet til Netlify
+2. Build command: `pnpm run build`
+3. Publish directory: `dist`
+4. Legg til disse miljøvariablene under **Site settings → Environment variables**:
+
+| Variabel | Verdi |
+|---|---|
+| `SUPABASE_URL` | https://xxxx.supabase.co |
+| `SUPABASE_SERVICE_KEY` | service_role nøkkel |
+| `VITE_SUPABASE_URL` | https://xxxx.supabase.co |
+| `VITE_SUPABASE_ANON_KEY` | anon nøkkel |
+| `ADMIN_PASSWORD` | velg et passord |
+| `VITE_FOOTBALL_API_KEY` | (valgfri) football-data.org nøkkel |
+
+---
 
 ## Poengsystem
 
 | Runde | Maks poeng |
 |---|---|
-| Gruppespill (×72) | 5 |
-| 16-delsfinale (×16) | 6 |
-| 8-delsfinale (×8) | 8 |
-| Kvartfinale (×4) | 10 |
-| Semifinale (×2) | 12 |
-| Bronsefinale (×1) | 14 |
-| Finale (×1) | 50 |
+| Gruppespill ×72 | 5 |
+| 16-delsfinale ×16 | 6 |
+| 8-delsfinale ×8 | 8 |
+| Kvartfinale ×4 | 10 |
+| Semifinale ×2 | 12 |
+| Bronsefinale ×1 | 14 |
+| Finale ×1 | 50 |
 | **Totalt** | **648** |
 
 ## Innsats
 
-- Voksne: 350 kr (Vipps før kampstart)
-- Barn: 50 kr
-
-## Teknisk stack
-
-- **Frontend:** Vite + React + TypeScript + Tailwind CSS
-- **Backend:** Express.js + better-sqlite3 (SQLite)
-- **Live-data:** football-data.org API
+- Voksne: 350 kr · Barn: 50 kr (Vipps før kampstart)
